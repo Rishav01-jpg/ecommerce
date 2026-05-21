@@ -1,4 +1,5 @@
 const Product = require("../models/Product");
+const redisClient = require("../config/redis");
 
 //
 // Create Product
@@ -47,6 +48,12 @@ exports.createProduct = async (req, res) => {
 //
 exports.getProducts = async (req, res) => {
   try {
+    const cacheKey = `products:${JSON.stringify(req.query)}`;
+    const cachedProducts = await redisClient.get(cacheKey);
+
+if (cachedProducts) {
+  return res.status(200).json(JSON.parse(cachedProducts));
+}
     const {
   keyword,
   category,
@@ -116,14 +123,22 @@ const products = await Product.find(query)
   .skip(skip)
   .limit(Number(limit));
 
-    res.status(200).json({
-      success: true,
-      currentPage: Number(page),
-      totalPages: Math.ceil(totalProducts / limit),
-      totalProducts,
-      count: products.length,
-      products,
-    });
+const responseData = {
+  success: true,
+  currentPage: Number(page),
+  totalPages: Math.ceil(totalProducts / limit),
+  totalProducts,
+  count: products.length,
+  products,
+};
+
+// Save to Redis for 10 minutes
+await redisClient.setEx(
+  cacheKey,
+  600,
+  JSON.stringify(responseData)
+);
+    res.status(200).json(responseData);
   } catch (error) {
     res.status(500).json({
       message: error.message,
