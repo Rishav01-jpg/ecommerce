@@ -1,16 +1,28 @@
 const redis = require("redis");
 
-const redisClient = redis.createClient({
-  url: "redis://127.0.0.1:6379",
-});
+let redisClient = null;
 
-redisClient.on("error", (err) => {
-  console.log("Redis Error:", err);
-});
+async function connectRedis() {
+  try {
+    redisClient = redis.createClient({
+      url: "redis://127.0.0.1:6379",
+      socket: {
+        reconnectStrategy: false,
+      },
+    });
 
-(async () => {
-  await redisClient.connect();
-  console.log("Redis Connected");
-})();
+    redisClient.on("error", (err) => {
+      console.log("Redis not available");
+    });
+
+    await redisClient.connect();
+
+    console.log("Redis Connected");
+  } catch (error) {
+    console.log("Running without Redis cache");
+  }
+}
+
+connectRedis();
 
 module.exports = redisClient;
